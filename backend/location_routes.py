@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from models import LocationModel, LocationUpdateRequest, LocationResponse, RegisterPushTokenRequest
 from database import db, upsert_location, get_all_locations, register_push_token
+from auth_routes import get_current_user_id
 
 # Initialize router
 router = APIRouter()
@@ -75,7 +76,10 @@ async def clear_location_history(user_id: str):
 
 
 @router.post("/update")
-async def update_location(request: LocationUpdateRequest):
+async def update_location(
+    request: LocationUpdateRequest,
+    current_user_id: int = Depends(get_current_user_id)
+):
     """
     Update a user's location.
     
@@ -85,7 +89,8 @@ async def update_location(request: LocationUpdateRequest):
     Returns:
         dict: Success message
     """
-    success = upsert_location(request.user_id, request.latitude, request.longitude)
+    # Use authenticated user_id instead of request.user_id
+    success = upsert_location(current_user_id, request.latitude, request.longitude)
     
     if success:
         return {"status": "success", "message": "Location updated successfully"}
@@ -106,7 +111,10 @@ async def get_all_locations_endpoint():
 
 
 @router.post("/register_token")
-async def register_token(request: RegisterPushTokenRequest):
+async def register_token(
+    request: RegisterPushTokenRequest,
+    current_user_id: int = Depends(get_current_user_id)
+):
     """
     Register or update a user's Expo push token.
     
@@ -116,7 +124,8 @@ async def register_token(request: RegisterPushTokenRequest):
     Returns:
         dict: Success message
     """
-    success = register_push_token(request.user_id, request.expo_push_token, request.name)
+    # Use authenticated user_id instead of request.user_id
+    success = register_push_token(current_user_id, request.expo_push_token, request.name)
     
     if success:
         return {"status": "success", "message": "Push token registered successfully"}

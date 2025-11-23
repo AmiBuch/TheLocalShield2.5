@@ -86,14 +86,13 @@ class PushNotificationRequest(BaseModel):
 
 class NotifyNearbyRequest(BaseModel):
     """Model for notify nearby emergency request."""
-    user_id: int = Field(..., description="User identifier")
     latitude: float = Field(..., description="Latitude coordinate")
     longitude: float = Field(..., description="Longitude coordinate")
+    # user_id is now obtained from JWT token, not from request
     
     class Config:
         json_schema_extra = {
             "example": {
-                "user_id": 1,
                 "latitude": 40.7128,
                 "longitude": -74.0060
             }
@@ -102,14 +101,13 @@ class NotifyNearbyRequest(BaseModel):
 
 class LocationUpdateRequest(BaseModel):
     """Model for location update request."""
-    user_id: int = Field(..., description="User identifier")
     latitude: float = Field(..., description="Latitude coordinate")
     longitude: float = Field(..., description="Longitude coordinate")
+    # user_id is now obtained from JWT token, not from request
     
     class Config:
         json_schema_extra = {
             "example": {
-                "user_id": 1,
                 "latitude": 40.7128,
                 "longitude": -74.0060
             }
@@ -136,16 +134,33 @@ class LocationResponse(BaseModel):
 
 class RegisterPushTokenRequest(BaseModel):
     """Model for push token registration request."""
-    user_id: int = Field(..., description="User identifier")
     expo_push_token: str = Field(..., description="Expo push notification token")
-    name: Optional[str] = Field(None, description="Optional user name")
+    # user_id is now obtained from JWT token, not from request
     
     class Config:
         json_schema_extra = {
             "example": {
-                "user_id": 1,
-                "expo_push_token": "ExponentPushToken[xxxxx]",
-                "name": "John Doe"
+                "expo_push_token": "ExponentPushToken[xxxxx]"
+            }
+        }
+
+
+class EmergencyEvent(BaseModel):
+    """Model for emergency event (used in polling endpoint)."""
+    id: int = Field(..., description="Emergency ID")
+    user_id: int = Field(..., description="User ID who triggered the emergency")
+    latitude: float = Field(..., description="Latitude coordinate")
+    longitude: float = Field(..., description="Longitude coordinate")
+    created_at: str = Field(..., description="Emergency creation timestamp (ISO format)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "user_id": 2,
+                "latitude": 40.7128,
+                "longitude": -74.0060,
+                "created_at": "2024-01-01T12:00:00"
             }
         }
 

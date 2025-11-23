@@ -3,10 +3,11 @@ Emergency-related API routes.
 Handles emergency requests and responses.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
-from models import EmergencyRequest, EmergencyResponse, NotifyNearbyRequest
-from database import db, upsert_location, get_user_push_tokens_except
+from fastapi import APIRouter, HTTPException, Depends, Request
+from typing import List, Optional, Dict, Any
+from models import EmergencyRequest, EmergencyResponse, NotifyNearbyRequest, EmergencyEvent
+from database import db, upsert_location, get_user_push_tokens_except, get_recent_emergencies, create_emergency
+from auth_routes import get_current_user_id
 from push_notifications import push_service
 
 # Initialize router
@@ -26,6 +27,78 @@ async def create_emergency_request(request: EmergencyRequest):
     """
     pass
 
+
+# IMPORTANT: /recent must come BEFORE /{emergency_id} to avoid route collision
+@router.get("/recent")
+async def get_recent_emergencies_endpoint(
+    request: Request,
+    since: Optional[str] = None
+):
+    """
+    Get recent emergency events (for POC polling).
+    
+    Args:
+        since: ISO timestamp - only return emergencies after this time
+        
+    Returns:
+        List of recent emergency events (always a list, never None)
+    """
+    print(f"🔍 /recent called with since={since}")
+    result = []
+    
+    try:
+        # Try to get user_id from token
+        exclude_id = None
+        try:
+            auth_header = request.headers.get("authorization", "")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                try:
+                    from auth_routes import verify_token
+                    user_data = verify_token(token)
+                    if user_data and isinstance(user_data, dict):
+                        exclude_id = user_data.get("user_id")
+                        print(f"🔑 Authenticated user_id: {exclude_id}")
+                except Exception as e:
+                    print(f"⚠️ Token verification failed: {e}")
+        except Exception as e:
+            print(f"⚠️ Auth header extraction failed: {e}")
+        
+        # Get emergencies from database
+        try:
+            emergencies = get_recent_emergencies(since, exclude_id)
+            print(f"📊 Database returned {len(emergencies) if emergencies else 0} emergencies")
+            print(f"📋 Raw emergencies: {emergencies}")
+            
+            if emergencies and isinstance(emergencies, list):
+                for emergency in emergencies:
+                    if emergency and isinstance(emergency, dict):
+                        try:
+                            validated = {
+                                'id': int(emergency.get('id', 0)),
+                                'user_id': int(emergency.get('user_id', 0)),
+                                'latitude': float(emergency.get('latitude', 0.0)),
+                                'longitude': float(emergency.get('longitude', 0.0)),
+                                'created_at': str(emergency.get('created_at', ''))
+                            }
+                            if validated['id'] > 0 and validated['user_id'] > 0:
+                                result.append(validated)
+                                print(f"✅ Added emergency: {validated}")
+                        except Exception as e:
+                            print(f"❌ Failed to validate emergency: {e}")
+                            continue
+        except Exception as e:
+            print(f"❌ Database error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    except Exception as e:
+        print(f"❌ Critical error in endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print(f"🎯 Returning {len(result)} emergencies: {result}")
+    return result
 
 @router.get("/{emergency_id}", response_model=EmergencyResponse)
 async def get_emergency(emergency_id: str):
@@ -94,7 +167,10 @@ async def cancel_emergency(emergency_id: str):
 
 
 @router.post("/notify_nearby")
-async def notify_nearby(request: NotifyNearbyRequest):
+async def notify_nearby(
+    request: NotifyNearbyRequest,
+    current_user_id: int = Depends(get_current_user_id)
+):
     """
     Notify nearby users about an emergency.
     
@@ -104,13 +180,19 @@ async def notify_nearby(request: NotifyNearbyRequest):
     Returns:
         dict: Status and number of recipients notified
     """
+    # Use authenticated user_id instead of request.user_id
+    user_id = current_user_id
+    
     # 1. Upsert location for sender
-    upsert_location(request.user_id, request.latitude, request.longitude)
+    upsert_location(user_id, request.latitude, request.longitude)
     
-    # 2. Query all other users' Expo push tokens
-    push_tokens = get_user_push_tokens_except(request.user_id)
+    # 2. Create emergency event in database (for POC polling)
+    emergency_id = create_emergency(user_id, request.latitude, request.longitude)
     
-    # 3. For each token, send a push notification
+    # 3. Query all other users' Expo push tokens
+    push_tokens = get_user_push_tokens_except(user_id)
+    
+    # 4. For each token, send a push notification (if available)
     title = "Emergency Alert"
     body = f"A nearby user is in an emergency. Location: {request.latitude}, {request.longitude}"
     
@@ -122,6 +204,6 @@ async def notify_nearby(request: NotifyNearbyRequest):
     
     return {
         "status": "sent",
-        "recipients": sent_count
+        "recipients": sent_count,
+        "emergency_id": emergency_id
     }
-

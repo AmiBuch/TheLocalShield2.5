@@ -1,0 +1,19 @@
+{
+  "name": "android-push-notifications",
+  "version": "1.0.0",
+  "description": "Custom native Android push notifications module using Kotlin",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "android",
+    "push-notifications",
+    "kotlin"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

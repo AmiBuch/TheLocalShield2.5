@@ -11,6 +11,7 @@ from database import db
 # Import routers
 from location_routes import router as location_router
 from emergency_routes import router as emergency_router
+from auth_routes import router as auth_router
 
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router, prefix="/auth", tags=["authentication"])
 app.include_router(location_router, prefix="/location", tags=["location"])
 app.include_router(emergency_router, prefix="/emergency", tags=["emergency"])
 
@@ -63,6 +65,26 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/test/emergencies")
+async def test_emergencies():
+    """Test endpoint to check if emergencies table works."""
+    from database import get_recent_emergencies
+    try:
+        emergencies = get_recent_emergencies()
+        return {
+            "status": "ok",
+            "count": len(emergencies),
+            "emergencies": emergencies
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 if __name__ == "__main__":

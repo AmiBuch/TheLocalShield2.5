@@ -11,6 +11,9 @@ import {
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { updateLocation, notifyNearby, registerPushToken } from '../services/api';
+import { getPushToken, requestPushPermissions } from '../services/pushNotifications';
+import { startEmergencyPolling, stopEmergencyPolling } from '../services/emergencyPolling';
+import { useAuth } from '../context/AuthContext';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -22,17 +25,26 @@ Notifications.setNotificationHandler({
 });
 
 export default function HomeScreen({ navigation }) {
+  const { user, logout } = useAuth();
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState(null);
-  const [userId] = useState(1); // TODO: Get from user authentication
 
   useEffect(() => {
-    requestPermissions();
-    registerForPushNotifications();
-  }, []);
+    if (user) {
+      requestPermissions();
+      registerForPushNotifications();
+      // Start polling for emergencies (POC - works in Expo Go)
+      startEmergencyPolling();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      stopEmergencyPolling();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (locationPermission) {
@@ -45,28 +57,31 @@ export default function HomeScreen({ navigation }) {
     const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
     setLocationPermission(locationStatus === 'granted');
 
-    // Request notification permission
-    const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
-    setNotificationPermission(notificationStatus === 'granted');
+    // Request notification permission (using custom service that tries native first)
+    const granted = await requestPushPermissions();
+    setNotificationPermission(granted);
   };
 
   const registerForPushNotifications = async () => {
     try {
-      const token = await Notifications.getExpoPushTokenAsync({
-        projectId: '8f7b24c7-0d79-4b3a-bcd5-2bbf43c75160', // From app.json extra.eas.projectId
-      });
-      setExpoPushToken(token.data);
-      console.log('Expo Push Token:', token.data);
+      // Use the custom push notification service (tries native Android module first)
+      const token = await getPushToken();
       
-      // Register the push token with the backend
-      try {
-        await registerPushToken(userId, token.data);
-        console.log('Push token registered with backend');
-      } catch (error) {
-        console.error('Error registering push token with backend:', error);
+      if (token) {
+        setExpoPushToken(token);
+        console.log('Push Token:', token);
+        
+        // Register the push token with the backend
+        try {
+          await registerPushToken(token);
+          console.log('Push token registered with backend');
+        } catch (error) {
+          console.error('Error registering push token with backend:', error);
+        }
       }
     } catch (error) {
-      console.error('Error getting push token:', error);
+      // Silently handle errors - push notifications are optional
+      console.warn('Push notifications not available:', error.message);
     }
   };
 
@@ -78,7 +93,6 @@ export default function HomeScreen({ navigation }) {
       // Update location on server
       if (currentLocation.coords) {
         await updateLocation(
-          userId,
           currentLocation.coords.latitude,
           currentLocation.coords.longitude
         );
@@ -110,7 +124,6 @@ export default function HomeScreen({ navigation }) {
             setLoading(true);
             try {
               const response = await notifyNearby(
-                userId,
                 location.latitude,
                 location.longitude
               );
@@ -174,14 +187,48 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.mapButtonText}>📍 View Map</Text>
         </TouchableOpacity>
 
+        {user && (
+          <View style={styles.userInfo}>
+            <Text style={styles.userText}>Logged in as: {user.email}</Text>
+            {user.name && <Text style={styles.userText}>{user.name}</Text>}
+          </View>
+        )}
+
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>
             Location: {locationPermission ? '✅' : '❌'}
           </Text>
           <Text style={styles.statusText}>
-            Notifications: {notificationPermission ? '✅' : '❌'}
+            Notifications: {notificationPermission && expoPushToken ? '✅' : expoPushToken ? '⚠️' : '❌'}
           </Text>
+          {!expoPushToken && (
+            <Text style={styles.warningText}>
+              Note: Push notifications require a development build (not available in Expo Go)
+            </Text>
+          )}
         </View>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={async () => {
+            Alert.alert(
+              'Logout',
+              'Are you sure you want to logout?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Logout',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await logout();
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -267,6 +314,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginVertical: 5,
+  },
+  warningText: {
+    fontSize: 11,
+    color: '#ff9800',
+    marginTop: 5,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  userInfo: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  userText: {
+    fontSize: 14,
+    color: '#666',
+    marginVertical: 2,
+  },
+  logoutButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  logoutButtonText: {
+    color: '#f5576c',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

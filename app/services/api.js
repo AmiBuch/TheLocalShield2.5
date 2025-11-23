@@ -2,7 +2,26 @@
  * API service for communicating with TheLocalShield backend
  */
 
+import { getToken } from './auth';
+
 const API_BASE_URL = 'http://10.139.172.87:8000';
+
+/**
+ * Get authorization headers with token
+ * @returns {Promise<Object>} Headers object with Authorization
+ */
+async function getAuthHeaders() {
+  const token = await getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
 
 /**
  * Update user location
@@ -11,15 +30,13 @@ const API_BASE_URL = 'http://10.139.172.87:8000';
  * @param {number} longitude - Longitude coordinate
  * @returns {Promise<Object>} Response from server
  */
-export async function updateLocation(userId, latitude, longitude) {
+export async function updateLocation(latitude, longitude) {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/location/update`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
       body: JSON.stringify({
-        user_id: userId,
         latitude: latitude,
         longitude: longitude,
       }),
@@ -42,11 +59,10 @@ export async function updateLocation(userId, latitude, longitude) {
  */
 export async function getAllLocations() {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/location/all`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
     });
 
     if (!response.ok) {
@@ -67,15 +83,13 @@ export async function getAllLocations() {
  * @param {number} longitude - Longitude coordinate
  * @returns {Promise<Object>} Response from server
  */
-export async function notifyNearby(userId, latitude, longitude) {
+export async function notifyNearby(latitude, longitude) {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/emergency/notify_nearby`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
       body: JSON.stringify({
-        user_id: userId,
         latitude: latitude,
         longitude: longitude,
       }),
@@ -99,17 +113,14 @@ export async function notifyNearby(userId, latitude, longitude) {
  * @param {string} name - Optional user name
  * @returns {Promise<Object>} Response from server
  */
-export async function registerPushToken(userId, expoPushToken, name = null) {
+export async function registerPushToken(expoPushToken) {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/location/register_token`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
       body: JSON.stringify({
-        user_id: userId,
         expo_push_token: expoPushToken,
-        name: name,
       }),
     });
 
