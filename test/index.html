@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheLocalShield API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        button {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-emergency {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-emergency:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        .btn-update {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-update:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-get {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .btn-get:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(67, 233, 123, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .response-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .response-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .response-content {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .loading {
+            color: #667eea;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success {
+            background-color: #28a745;
+        }
+
+        .status-error {
+            background-color: #dc3545;
+        }
+
+        .status-loading {
+            background-color: #667eea;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ TheLocalShield API Tester</h1>
+        <p class="subtitle">Test location storage, push notifications, and emergency endpoints</p>
+
+        <div class="form-group">
+            <label for="user_id">User ID</label>
+            <input type="number" id="user_id" placeholder="e.g., 1" value="1">
+        </div>
+
+        <div class="form-group">
+            <label for="token">Expo Push Token (optional, for testing notifications)</label>
+            <input type="text" id="token" placeholder="ExponentPushToken[xxxxx]">
+        </div>
+
+        <div class="form-group">
+            <label for="latitude">Latitude</label>
+            <input type="number" id="latitude" step="any" placeholder="e.g., 40.7128" value="40.7128">
+        </div>
+
+        <div class="form-group">
+            <label for="longitude">Longitude</label>
+            <input type="number" id="longitude" step="any" placeholder="e.g., -74.0060" value="-74.0060">
+        </div>
+
+        <div class="button-group">
+            <button class="btn-emergency" onclick="sendEmergency()">🚨 Send Emergency</button>
+            <button class="btn-update" onclick="updateLocation()">📍 Update Location</button>
+            <button class="btn-get" onclick="getAllLocations()">📋 Get All Locations</button>
+        </div>
+
+        <div class="response-section">
+            <h2>
+                <span id="status-indicator" class="status-indicator"></span>
+                Response
+            </h2>
+            <div id="response-content" class="response-content">No requests made yet. Click a button above to test the API.</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        function updateResponse(content, type = 'info') {
+            const responseContent = document.getElementById('response-content');
+            const statusIndicator = document.getElementById('status-indicator');
+            
+            responseContent.textContent = content;
+            responseContent.className = 'response-content ' + type;
+            
+            // Update status indicator
+            statusIndicator.className = 'status-indicator';
+            if (type === 'success') {
+                statusIndicator.classList.add('status-success');
+            } else if (type === 'error') {
+                statusIndicator.classList.add('status-error');
+            } else if (type === 'loading') {
+                statusIndicator.classList.add('status-loading');
+            }
+        }
+
+        function getFormData() {
+            return {
+                user_id: parseInt(document.getElementById('user_id').value),
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value),
+                token: document.getElementById('token').value
+            };
+        }
+
+        async function sendEmergency() {
+            const data = getFormData();
+            
+            if (!data.user_id || isNaN(data.latitude) || isNaN(data.longitude)) {
+                updateResponse('Error: Please fill in user_id, latitude, and longitude', 'error');
+                return;
+            }
+
+            updateResponse('Sending emergency notification...', 'loading');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/emergency/notify_nearby`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: data.user_id,
+                        latitude: data.latitude,
+                        longitude: data.longitude
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateResponse(
+                        `✅ Emergency notification sent successfully!\n\n` +
+                        `Status: ${result.status}\n` +
+                        `Recipients notified: ${result.recipients}\n\n` +
+                        `Full response:\n${JSON.stringify(result, null, 2)}`,
+                        'success'
+                    );
+                } else {
+                    updateResponse(
+                        `❌ Error: ${response.status} ${response.statusText}\n\n` +
+                        `${JSON.stringify(result, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                updateResponse(
+                    `❌ Network Error: ${error.message}\n\n` +
+                    `Make sure the server is running at ${API_BASE_URL}`,
+                    'error'
+                );
+            }
+        }
+
+        async function updateLocation() {
+            const data = getFormData();
+            
+            if (!data.user_id || isNaN(data.latitude) || isNaN(data.longitude)) {
+                updateResponse('Error: Please fill in user_id, latitude, and longitude', 'error');
+                return;
+            }
+
+            updateResponse('Updating location...', 'loading');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/location/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: data.user_id,
+                        latitude: data.latitude,
+                        longitude: data.longitude
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateResponse(
+                        `✅ Location updated successfully!\n\n` +
+                        `User ID: ${data.user_id}\n` +
+                        `Latitude: ${data.latitude}\n` +
+                        `Longitude: ${data.longitude}\n\n` +
+                        `Full response:\n${JSON.stringify(result, null, 2)}`,
+                        'success'
+                    );
+                } else {
+                    updateResponse(
+                        `❌ Error: ${response.status} ${response.statusText}\n\n` +
+                        `${JSON.stringify(result, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                updateResponse(
+                    `❌ Network Error: ${error.message}\n\n` +
+                    `Make sure the server is running at ${API_BASE_URL}`,
+                    'error'
+                );
+            }
+        }
+
+        async function getAllLocations() {
+            updateResponse('Fetching all locations...', 'loading');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/location/all`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    if (Array.isArray(result) && result.length > 0) {
+                        let locationsText = `✅ Found ${result.length} location(s):\n\n`;
+                        result.forEach((loc, index) => {
+                            locationsText += `Location ${index + 1}:\n`;
+                            locationsText += `  User ID: ${loc.user_id}\n`;
+                            locationsText += `  Latitude: ${loc.latitude}\n`;
+                            locationsText += `  Longitude: ${loc.longitude}\n`;
+                            locationsText += `  Last Updated: ${loc.last_updated}\n\n`;
+                        });
+                        locationsText += `\nFull JSON response:\n${JSON.stringify(result, null, 2)}`;
+                        updateResponse(locationsText, 'success');
+                    } else {
+                        updateResponse(
+                            `✅ No locations found in database.\n\n` +
+                            `Full response:\n${JSON.stringify(result, null, 2)}`,
+                            'success'
+                        );
+                    }
+                } else {
+                    updateResponse(
+                        `❌ Error: ${response.status} ${response.statusText}\n\n` +
+                        `${JSON.stringify(result, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                updateResponse(
+                    `❌ Network Error: ${error.message}\n\n` +
+                    `Make sure the server is running at ${API_BASE_URL}`,
+                    'error'
+                );
+            }
+        }
+
+        // Allow Enter key to trigger buttons
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.tagName === 'INPUT') {
+                    // Find the next button or default to Update Location
+                    updateLocation();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
